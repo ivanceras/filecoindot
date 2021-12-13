@@ -303,6 +303,26 @@ pub fn serialize_to_slice<
 pub type HAMTNodeType =
     ForestAdaptedNode<usize, String, ForestAdaptedHashAlgo, ForestAdaptedHashedBits>;
 
+pub fn generic_generate_proof(
+    block_store: &ForestAdaptedBlockStorage<ipld_blockstore::MemoryDB>,
+    cid: &Cid,
+    index: usize,
+) -> Result<Vec<Vec<u8>>, Error> {
+    use crate::Hamt;
+    use ipld_blockstore::MemoryDB;
+
+    let hamt: Hamt<
+        ForestAdaptedBlockStorage<MemoryDB>,
+        usize,
+        String,
+        ForestAdaptedHashedBits,
+        ForestAdaptedNode<usize, String, ForestAdaptedHashAlgo, _>,
+        ForestAdaptedHashAlgo,
+    > = Hamt::new(cid, block_store, 8)?;
+
+    hamt.generate_proof(&index)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -320,6 +340,22 @@ mod tests {
         HAMTNodeType,
         ForestAdaptedHashAlgo,
     >;
+
+    #[test]
+    fn test_generic_generate_proof() {
+        let bs = MemoryDB::default();
+        let mut fhamt: ForestHamt<_, _, usize> = ForestHamt::new(&bs);
+
+        let max = 1000;
+        for i in 1..max {
+            fhamt.set(i, i.to_string()).unwrap();
+        }
+
+        let cid = fhamt.flush().unwrap();
+        let store = ForestAdaptedBlockStorage::new(bs);
+        let ret = generic_generate_proof(&store, &cid, 1);
+        assert!(ret.is_ok());
+    }
 
     #[test]
     fn test_basic_proof_generation() {
